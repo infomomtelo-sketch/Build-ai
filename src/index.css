@@ -1420,6 +1420,10 @@ a {
   padding: var(--space-4);
   text-align: left;
   align-content: start;
+  /* Grid items default to min-width:auto, so long nowrap text would push the
+     card wider than its track and spill past the border. */
+  min-width: 0;
+  overflow: hidden;
   transition:
     border-color var(--dur-fast) var(--ease-out),
     transform var(--dur-fast) var(--ease-out);
@@ -1450,11 +1454,19 @@ a {
 
 .project-card__stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-width: 0;
   gap: var(--space-2);
   margin: 0;
   padding-top: var(--space-3);
   border-top: 1px solid var(--border-hairline);
+}
+
+.project-card__stats dt,
+.project-card__stats dd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .project-card__stats dd {
@@ -1470,12 +1482,23 @@ a {
   font-size: 10px;
   color: var(--text-faint);
   padding-top: var(--space-2);
+  min-width: 0;
 }
 
 .project-card__foot span {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The stack string is the long one; let it yield first. */
+.project-card__foot span:first-child {
+  flex: 1 1 auto;
+}
+
+.project-card__foot span:last-child {
+  flex: 0 0 auto;
 }
 
 /* ── project detail ─────────────────────────────────────────────────────── */

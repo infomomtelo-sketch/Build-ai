@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.worker.json --noEmit",
     "preview": "npm run build && wrangler dev",
     "deploy": "npm run build && wrangler deploy",
+    "setup": "bash scripts/setup.sh",
     "db:migrate:local": "wrangler d1 migrations apply jarvis --local",
     "db:migrate": "wrangler d1 migrations apply jarvis --remote"
   },

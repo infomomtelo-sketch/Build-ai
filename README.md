@@ -38,6 +38,31 @@ goes live only once it reads real data.
 
 ## First-time setup
 
+### The short way
+
+Register a GitHub OAuth app first (see step 3 below for the two URLs), then:
+
+```bash
+npm install
+npx wrangler login
+npm run setup
+```
+
+`npm run setup` creates the D1 database, writes its id into `wrangler.jsonc`,
+applies migrations, generates `SESSION_SECRET`, prompts for the remaining
+secrets, builds, deploys, and verifies the result — including asserting that dev
+login is off in production.
+
+It is safe to re-run. Every step checks current state first, and an existing
+`SESSION_SECRET` is never rotated unless you pass `--rotate-session-secret`.
+To run it unattended, export `OWNER_EMAILS`, `GITHUB_CLIENT_ID` and
+`GITHUB_CLIENT_SECRET` instead of answering prompts.
+
+Commit the `wrangler.jsonc` change it makes, so later deploys reuse the same
+database.
+
+### The manual way
+
 ### 1. Create the database
 
 ```bash

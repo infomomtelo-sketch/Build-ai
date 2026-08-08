@@ -1,6 +1,16 @@
 import type { Env } from "./env";
 import { json, fail, mergeHeaders, SECURITY_HEADERS } from "./http";
-import { authConfig, devLogin, githubCallback, githubStart, logout } from "./auth";
+import {
+  authConfig,
+  devLogin,
+  githubCallback,
+  githubStart,
+  logout,
+  misroutedCallback,
+  GITHUB_CALLBACK_PATH,
+  GITHUB_CALLBACK_PATH_TRANSPOSED,
+  GITHUB_START_PATH,
+} from "./auth";
 import { getViewer } from "./session";
 import { hasRole } from "./roles";
 import { pruneRateLimits } from "./ratelimit";
@@ -12,8 +22,9 @@ import { pruneRateLimits } from "./ratelimit";
 const PUBLIC_ROUTES = new Set([
   "GET /api/health",
   "GET /api/auth/config",
-  "GET /api/auth/github/start",
-  "GET /api/auth/github/callback",
+  `GET ${GITHUB_START_PATH}`,
+  `GET ${GITHUB_CALLBACK_PATH}`,
+  `GET ${GITHUB_CALLBACK_PATH_TRANSPOSED}`,
   "POST /api/auth/dev-login",
   "POST /api/auth/logout",
 ]);
@@ -52,10 +63,13 @@ async function handleApi(
   }
 
   if (route === "GET /api/auth/config") return authConfig(env);
-  if (route === "GET /api/auth/github/start") return githubStart(env, request);
-  if (route === "GET /api/auth/github/callback") {
+  if (route === `GET ${GITHUB_START_PATH}`) return githubStart(env, request);
+  if (route === `GET ${GITHUB_CALLBACK_PATH}`) {
     ctx.waitUntil(pruneRateLimits(env));
     return githubCallback(env, request);
+  }
+  if (route === `GET ${GITHUB_CALLBACK_PATH_TRANSPOSED}`) {
+    return misroutedCallback(env, request);
   }
   if (route === "POST /api/auth/dev-login") return devLogin(env, request);
   if (route === "POST /api/auth/logout") return logout(env, request);

@@ -44,9 +44,18 @@ Register a GitHub OAuth app first (see step 3 below for the two URLs), then:
 
 ```bash
 npm install
-npx wrangler login
+npx wrangler login          # or: export CLOUDFLARE_API_TOKEN=…
 npm run setup
 ```
+
+`wrangler login` opens a browser. To stay headless — CI, a container, a remote
+session — create an API token instead (My Profile → API Tokens → *Edit
+Cloudflare Workers* template, plus **D1:Edit**) and export
+`CLOUDFLARE_API_TOKEN`. Everything below works identically either way.
+
+Keep the token out of shell history and out of the repo: put it in a file the
+shell sources, or your secret manager, rather than typing
+`export CLOUDFLARE_API_TOKEN=…` inline.
 
 `npm run setup` creates the D1 database, writes its id into `wrangler.jsonc`,
 applies migrations, generates `SESSION_SECRET`, prompts for the remaining
@@ -87,6 +96,14 @@ Create one at <https://github.com/settings/developers>:
 - **Authorization callback URL** —
   `https://jarvis-build-command.infomomtelo.workers.dev/api/auth/github/callback`
 
+> **The callback path is `/api/auth/github/callback`.**
+> Not `/api/auth/callback/github` — the segment order matters. The Worker sends
+> this exact path as its `redirect_uri` and GitHub compares it byte-for-byte,
+> so a swapped or trailing-slashed version fails with a `redirect_uri` mismatch
+> before your code ever runs. The path is defined once as
+> `GITHUB_CALLBACK_PATH` in `worker/auth.ts`; if you change it there, re-register
+> the app to match.
+
 ### 4. Set the secrets
 
 These live only inside the Worker. Nothing in this codebase returns, logs, or
@@ -124,6 +141,30 @@ Then, in two terminals:
 npm run dev:api    # Worker + local D1 on :8787
 npm run dev        # UI on :5173, proxying /api to :8787
 ```
+
+### Signing in locally
+
+`ALLOW_DEV_LOGIN` exists precisely so you do **not** need a GitHub OAuth app to
+work locally. Use it unless you are specifically testing the OAuth flow itself.
+
+If you do want the real GitHub flow locally, register a **second** OAuth app —
+a GitHub OAuth app has exactly one callback URL, so localhost cannot share the
+production app. Which URL you register depends on the port you open in the
+browser, because the Worker derives its `redirect_uri` from the incoming
+`Host` header:
+
+| You run           | You open                | Register                                          |
+| ----------------- | ----------------------- | ------------------------------------------------- |
+| `npm run dev`     | `http://localhost:5173` | `http://localhost:5173/api/auth/github/callback`   |
+| `npm run preview` | `http://localhost:8787` | `http://localhost:8787/api/auth/github/callback`   |
+
+The Vite proxy is configured with `changeOrigin: false`, so the browser's origin
+passes straight through to the Worker — verified, not assumed. Register the port
+you actually browse to, and use `localhost` consistently: `127.0.0.1` and
+`localhost` are different origins to GitHub.
+
+Then add `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` for that second app to
+`.dev.vars`.
 
 `ALLOW_DEV_LOGIN` skips the OAuth round trip but **not** the owner allowlist —
 a non-allowlisted address is refused locally exactly as it is in production. It

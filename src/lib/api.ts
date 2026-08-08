@@ -83,4 +83,7 @@ export const AUTH_ERROR_COPY: Record<string, string> = {
   bad_state: "Sign-in session expired or was tampered with. Start again.",
   missing_code: "GitHub did not return an authorization code.",
   rate_limited: "Too many sign-in attempts. Wait a few minutes.",
+  callback_path_mismatch:
+    "Your GitHub OAuth app points at /api/auth/callback/github. The correct " +
+    "callback is /api/auth/github/callback — update the app and try again.",
 };

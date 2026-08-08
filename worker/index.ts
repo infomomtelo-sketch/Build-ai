@@ -13,7 +13,17 @@ import {
 } from "./auth";
 import { getViewer } from "./session";
 import { hasRole } from "./roles";
-import { pruneRateLimits } from "./ratelimit";
+import { pruneRateLimits, rateLimit } from "./ratelimit";
+import {
+  handleCore,
+  handleCreateProject,
+  handleDeleteProject,
+  handleGetProject,
+  handleListProjects,
+  handleOverview,
+  handleRecordMetrics,
+  handleUpdateProject,
+} from "./api";
 
 /**
  * Route table. Anything not listed as public requires an authenticated viewer
@@ -58,8 +68,10 @@ async function handleApi(
   env: Env,
   ctx: ExecutionContext,
 ): Promise<Response> {
+  const url = new URL(request.url);
+
   if (route === "GET /api/health") {
-    return json({ ok: true, app: env.APP_NAME ?? "JARVIS", phase: 1 });
+    return json({ ok: true, app: env.APP_NAME ?? "JARVIS", phase: 2 });
   }
 
   if (route === "GET /api/auth/config") return authConfig(env);
@@ -99,15 +111,49 @@ async function handleApi(
     });
   }
 
-  if (route === "GET /api/core") {
-    // Phase 1: the core orb runs on a real endpoint with placeholder telemetry.
-    // Phase 2 replaces this with the project registry; the shape stays.
-    return json({
-      activity: 0,
-      nodes: [],
-      phase: 1,
-      message: "Project registry lands in phase 2.",
-    });
+  if (route === "GET /api/core") return handleCore(env);
+  if (route === "GET /api/overview") return handleOverview(env);
+
+  // ── project registry ────────────────────────────────────────────────────
+  if (route === "GET /api/projects") return handleListProjects(env);
+  if (route === "POST /api/projects") {
+    const limit = await rateLimit(env, "write", viewer.id, 120, 60);
+    if (!limit.allowed) return fail(429, "rate_limited", "Slow down.");
+    return handleCreateProject(env, request, viewer);
+  }
+
+  // /api/projects/:id and /api/projects/:id/metrics
+  const projectMatch = url.pathname.match(
+    /^\/api\/projects\/([0-9a-fA-F-]{36})(\/metrics)?$/,
+  );
+  if (projectMatch) {
+    const [, projectId, metricsSuffix] = projectMatch;
+
+    if (metricsSuffix) {
+      if (request.method !== "POST") {
+        return fail(405, "method_not_allowed", "Use POST to record metrics.");
+      }
+      const limit = await rateLimit(env, "write", viewer.id, 120, 60);
+      if (!limit.allowed) return fail(429, "rate_limited", "Slow down.");
+      return handleRecordMetrics(env, request, projectId, viewer);
+    }
+
+    switch (request.method) {
+      case "GET":
+        return handleGetProject(env, projectId);
+      case "PATCH": {
+        const limit = await rateLimit(env, "write", viewer.id, 120, 60);
+        if (!limit.allowed) return fail(429, "rate_limited", "Slow down.");
+        return handleUpdateProject(env, request, projectId, viewer);
+      }
+      case "DELETE": {
+        const limit = await rateLimit(env, "write", viewer.id, 120, 60);
+        if (!limit.allowed) return fail(429, "rate_limited", "Slow down.");
+        return handleDeleteProject(env, projectId, viewer);
+      }
+      default:
+        return fail(405, "method_not_allowed", "Unsupported method.");
+    }
   }
 
   return fail(404, "not_found", "No such endpoint.");

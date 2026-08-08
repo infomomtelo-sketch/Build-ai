@@ -95,7 +95,7 @@ export const PHASES: { n: number; label: string }[] = [
 ];
 
 /** Phases that are complete and shipped. */
-export const SHIPPED_THROUGH = 1;
+export const SHIPPED_THROUGH = 2;
 
 export function entryForPath(pathname: string): NavEntry {
   return NAV.find((n) => n.path === pathname) ?? NAV[0];

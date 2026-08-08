@@ -55,12 +55,130 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await res.json()) as T;
 }
 
+export type Health = "nominal" | "warn" | "critical" | "idle";
+export type ProjectStatus = "active" | "paused" | "archived";
+
+export interface ProjectLatest {
+  day: string;
+  mrrCents: number;
+  users: number;
+  errors: number;
+  uptimePct: number | null;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  slug: string;
+  domain: string | null;
+  stack: string | null;
+  repoFullName: string | null;
+  health: Health;
+  status: ProjectStatus;
+  notes: string | null;
+  lastDeployAt: string | null;
+  createdAt: string;
+  latest: ProjectLatest | null;
+}
+
+export interface MetricPoint {
+  day: string;
+  mrrCents: number;
+  users: number;
+  signups: number;
+  deploys: number;
+  errors: number;
+  uptimePct: number | null;
+  source: string;
+}
+
+export interface OverviewEvent {
+  id: number;
+  at: string;
+  kind: string;
+  severity: "info" | "warn" | "critical";
+  message: string;
+  projectName: string | null;
+}
+
+export interface Overview {
+  totals: {
+    mrrCents: number;
+    users: number;
+    signups7: number;
+    deploys7: number;
+    errors: number;
+    projects: number;
+    activeIncidents: number | null;
+  };
+  byHealth: Record<Health, number>;
+  series: { day: string; mrrCents: number; users: number; signups: number; deploys: number }[];
+  projects: {
+    id: string;
+    name: string;
+    health: Health;
+    domain: string | null;
+    mrrCents: number | null;
+    users: number | null;
+    lastMetricDay: string | null;
+  }[];
+  events: OverviewEvent[];
+}
+
+export interface ProjectInput {
+  name: string;
+  domain?: string | null;
+  stack?: string | null;
+  repoFullName?: string | null;
+  health?: Health;
+  status?: ProjectStatus;
+  notes?: string | null;
+}
+
+export interface MetricsInput {
+  day?: string;
+  mrr?: string | number;
+  users?: string | number;
+  signups?: string | number;
+  deploys?: string | number;
+  errors?: string | number;
+  uptimePct?: string | number | null;
+}
+
 export const api = {
   authConfig: () => request<AuthConfig>("/api/auth/config"),
 
   me: () => request<Viewer>("/api/me"),
 
   core: () => request<CoreTelemetry>("/api/core"),
+
+  overview: () => request<Overview>("/api/overview"),
+
+  projects: () => request<{ projects: Project[] }>("/api/projects"),
+
+  project: (id: string) =>
+    request<{ project: Project; metrics: MetricPoint[] }>(`/api/projects/${id}`),
+
+  createProject: (input: ProjectInput) =>
+    request<{ project: Project }>("/api/projects", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  updateProject: (id: string, input: Partial<ProjectInput>) =>
+    request<{ project: Project }>(`/api/projects/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+
+  deleteProject: (id: string) =>
+    request<{ ok: true }>(`/api/projects/${id}`, { method: "DELETE" }),
+
+  recordMetrics: (id: string, input: MetricsInput) =>
+    request<{ ok: true; day: string }>(`/api/projects/${id}/metrics`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
 
   devLogin: (email: string) =>
     request<{ ok: true }>("/api/auth/dev-login", {

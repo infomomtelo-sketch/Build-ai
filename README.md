@@ -49,13 +49,24 @@ npm run setup
 ```
 
 `wrangler login` opens a browser. To stay headless — CI, a container, a remote
-session — create an API token instead (My Profile → API Tokens → *Edit
-Cloudflare Workers* template, plus **D1:Edit**) and export
-`CLOUDFLARE_API_TOKEN`. Everything below works identically either way.
+session — create an API token instead and export `CLOUDFLARE_API_TOKEN`.
+Everything below works identically either way.
 
-Keep the token out of shell history and out of the repo: put it in a file the
-shell sources, or your secret manager, rather than typing
-`export CLOUDFLARE_API_TOKEN=…` inline.
+Token scopes: **Workers Scripts: Edit**, **D1: Edit**, **Account Settings:
+Read** (the last is what `wrangler whoami` reads to resolve your account).
+
+Keep the token out of shell history — write it to a file without ever passing
+it as an argument, then source that file per session:
+
+```bash
+mkdir -p ~/.config/cloudflare
+read -rs TOKEN                                   # typed, not echoed, not in history
+printf 'CLOUDFLARE_API_TOKEN=%s\n' "$TOKEN" > ~/.config/cloudflare/env
+chmod 600 ~/.config/cloudflare/env
+unset TOKEN
+
+set -a; . ~/.config/cloudflare/env; set +a       # once per shell session
+```
 
 `npm run setup` creates the D1 database, writes its id into `wrangler.jsonc`,
 applies migrations, generates `SESSION_SECRET`, prompts for the remaining

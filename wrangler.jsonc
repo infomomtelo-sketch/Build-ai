@@ -1,0 +1,39 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jarvis-build-command",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "jarvis",
+      // Replace with the id printed by: wrangler d1 create jarvis
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "vars": {
+    // Public, non-secret configuration only. Secrets live in `wrangler secret put`.
+    "APP_NAME": "JARVIS",
+    "ENVIRONMENT": "production"
+  },
+
+  "observability": {
+    "enabled": true
+  }
+
+  // Secrets required in production (never committed, never sent to the browser):
+  //   wrangler secret put OWNER_EMAILS       e.g. "you@example.com,you@work.com"
+  //   wrangler secret put SESSION_SECRET     openssl rand -hex 32
+  //   wrangler secret put GITHUB_CLIENT_ID
+  //   wrangler secret put GITHUB_CLIENT_SECRET
+}

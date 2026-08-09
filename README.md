@@ -5,9 +5,10 @@
 A single-operator mission control that monitors, codes, fixes, and deploys every
 app you own. Dark, cinematic, HUD-style.
 
-**Phase 1 is shipped:** auth, server-side owner allowlist, the shell layout, and
-the animated core. Phases 2–7 are scaffolded but deliberately empty — a screen
-goes live only once it reads real data.
+**Phases 1–2 are shipped:** auth, owner allowlist, shell, animated core, project
+registry, and manual metrics entry. The wall displays per-project health, MRR
+trend, users, errors, and a rolling event log. Phases 3–7 are scaffolded but
+deliberately empty — a screen goes live only once it reads real data.
 
 ---
 
@@ -27,7 +28,7 @@ goes live only once it reads real data.
 | # | Scope                                              | State      |
 | - | -------------------------------------------------- | ---------- |
 | 1 | Auth + owner allowlist + shell + animated core      | **Shipped** |
-| 2 | Project registry + manual metrics entry             | Pending    |
+| 2 | Project registry + manual metrics entry + wall       | **Shipped** |
 | 3 | GitHub read (tree, file, commits) + repo console    | Pending    |
 | 4 | Metrics + error ingest + fix queue                  | Pending    |
 | 5 | AI assistant with read-only tools                   | Pending    |
@@ -263,10 +264,15 @@ worker/            Cloudflare Worker — API, auth, authorization
   roles.ts         hasRole() — the single authorization chokepoint
   ratelimit.ts     D1 fixed-window limiter
   crypto.ts        HMAC signing, opaque ids, IP hashing
+  projects.ts      (Phase 2) Project registry and metrics data layer
+  api.ts           (Phase 2) API handlers: project CRUD, metrics, overview
 migrations/        D1 schema
+  0001_*           Auth foundation (profiles, sessions, roles)
+  0002_*           Project registry (projects, metrics_daily, events)
 src/               React client
-  components/      CoreOrb, AppShell, AssistantDock, icons
-  screens/         Login, Overview, PhasePending
-  lib/             API client, navigation config
+  components/      CoreOrb, AppShell, AssistantDock, Modal, ProjectForm, icons
+  screens/         Login, Overview, Projects, ProjectDetail, PhasePending
+  lib/             API client, navigation config, formatters
+scripts/           Deployment and seeding
 legacy/            Prior unrelated prototype, kept for reference
 ```

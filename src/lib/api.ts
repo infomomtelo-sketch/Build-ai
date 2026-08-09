@@ -187,6 +187,18 @@ export const api = {
     }),
 
   logout: () => request<{ ok: true }>("/api/auth/logout", { method: "POST" }),
+
+  repoList: () =>
+    request<{ repos: string[] }>("/api/github/repos"),
+
+  repoTree: (repo: string, path?: string) =>
+    request<{ tree: any[] }>(`/api/github/repos/${repo}/tree${path ? `?path=${encodeURIComponent(path)}` : ""}`),
+
+  repoCommits: (repo: string) =>
+    request<{ commits: any[] }>(`/api/github/repos/${repo}/commits`),
+
+  repoFile: (repo: string, path: string) =>
+    request<{ file: any }>(`/api/github/repos/${repo}/file?path=${encodeURIComponent(path)}`),
 };
 
 /** Human-readable text for the error codes the auth redirect can hand back. */

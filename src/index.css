@@ -1718,6 +1718,183 @@ a {
   overflow-y: auto;
 }
 
+/* ── repo console ───────────────────────────────────────────────────────── */
+
+.repo-selector {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 var(--space-4);
+}
+
+.repo-selector label {
+  flex-shrink: 0;
+}
+
+.repo-select {
+  flex: 1;
+  min-width: 0;
+  padding: 10px var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-inset);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.repo-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) minmax(400px, 1fr);
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.repo-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.repo-tree {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.tree-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 600px;
+  overflow-y: auto;
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+}
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  gap: var(--space-2);
+}
+
+.tree-item:hover {
+  background: var(--surface-hover);
+}
+
+.tree-item[data-selected="true"] {
+  background: var(--surface-panel);
+  border-left: 2px solid var(--accent);
+  padding-left: calc(var(--space-3) - 2px);
+}
+
+.tree-item__icon {
+  width: 20px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.tree-item__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-item__size {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.repo-file {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+}
+
+.file-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.file-viewer__meta {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  color: var(--text-muted);
+}
+
+.commit-log {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.commit {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+}
+
+.commit__sha {
+  flex-shrink: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+  color: var(--accent-bright);
+  font-size: var(--text-xs);
+}
+
+.commit__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.commit__msg {
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit__meta {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
 /* ── responsive ─────────────────────────────────────────────────────────── */
 
 @media (max-width: 1500px) {

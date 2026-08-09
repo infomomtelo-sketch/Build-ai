@@ -12,6 +12,7 @@ import {
 import { rateLimit } from "./ratelimit";
 import { grantRole, isAllowlistedOwner } from "./roles";
 import { createSession, destroySession, getViewer } from "./session";
+import { storeGitHubToken } from "./github";
 
 const OAUTH_STATE_COOKIE = "jarvis_oauth_state";
 const OAUTH_SCOPES = "read:user user:email";
@@ -220,10 +221,9 @@ export async function githubCallback(env: Env, request: Request): Promise<Respon
 
   await grantRole(env, userId, "owner");
   await createSession(env, request, userId, headers);
+  await storeGitHubToken(env, userId, accessToken, ghUser.login, ghUser.id, ghUser.avatar_url ?? "");
   await logAuthEvent(env, request, "login_ok", email, "github");
 
-  // The GitHub access token is intentionally discarded here. Phase 3 will
-  // store it encrypted in `integrations`, server-side only.
   return redirect(new URL("/", url.origin).toString(), headers);
 }
 

@@ -24,6 +24,12 @@ import {
   handleRecordMetrics,
   handleUpdateProject,
 } from "./api";
+import {
+  handleListRepos,
+  handleGetRepoTree,
+  handleGetRepoFile,
+  handleGetRepoCommits,
+} from "./github";
 
 /**
  * Route table. Anything not listed as public requires an authenticated viewer
@@ -153,6 +159,30 @@ async function handleApi(
       }
       default:
         return fail(405, "method_not_allowed", "Unsupported method.");
+    }
+  }
+
+  // ── github integration (phase 3) ────────────────────────────────────────
+  if (route === "GET /api/github/repos") return handleListRepos(env, viewer.id);
+
+  const repoMatch = url.pathname.match(/^\/api\/github\/repos\/([^\/]+)(?:\/(.*))?$/);
+  if (repoMatch) {
+    const repo = decodeURIComponent(repoMatch[1]);
+    const subpath = repoMatch[2];
+
+    if (subpath === "tree") {
+      const path = url.searchParams.get("path") ?? undefined;
+      return handleGetRepoTree(env, viewer.id, repo, path);
+    }
+
+    if (subpath?.startsWith("file?")) {
+      const path = url.searchParams.get("path") ?? "";
+      if (!path) return fail(400, "bad_request", "File path required.");
+      return handleGetRepoFile(env, viewer.id, repo, path);
+    }
+
+    if (subpath === "commits") {
+      return handleGetRepoCommits(env, viewer.id, repo);
     }
   }
 

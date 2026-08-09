@@ -4,6 +4,7 @@ import { Login } from "./screens/Login";
 import { Overview } from "./screens/Overview";
 import { Projects } from "./screens/Projects";
 import { ProjectDetail } from "./screens/ProjectDetail";
+import { RepoConsole } from "./screens/RepoConsole";
 import { PhasePending } from "./screens/PhasePending";
 import { NAV, SHIPPED_THROUGH, entryForPath } from "./lib/nav";
 import {
@@ -150,6 +151,8 @@ export default function App() {
         onOpenProject={openProject}
       />
     );
+  } else if (entry.id === "repo") {
+    screen = <RepoConsole />;
   } else if (entry.phase <= SHIPPED_THROUGH) {
     screen = <PhasePending entry={entry} />;
   } else {

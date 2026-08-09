@@ -7,8 +7,9 @@ app you own. Dark, cinematic, HUD-style.
 
 **Phases 1–2 are shipped:** auth, owner allowlist, shell, animated core, project
 registry, and manual metrics entry. The wall displays per-project health, MRR
-trend, users, errors, and a rolling event log. Phases 3–7 are scaffolded but
-deliberately empty — a screen goes live only once it reads real data.
+trend, users, errors, and a rolling event log. **Phase 3 is scaffolded** with GitHub
+read (tree/file/commit browsing); it goes live once deployed. Phases 4–7 are
+scaffolded but empty — a screen goes live only once it reads real data.
 
 ---
 
@@ -29,7 +30,7 @@ deliberately empty — a screen goes live only once it reads real data.
 | - | -------------------------------------------------- | ---------- |
 | 1 | Auth + owner allowlist + shell + animated core      | **Shipped** |
 | 2 | Project registry + manual metrics entry + wall       | **Shipped** |
-| 3 | GitHub read (tree, file, commits) + repo console    | Pending    |
+| 3 | GitHub read (tree, file, commits) + repo console    | Scaffolded |
 | 4 | Metrics + error ingest + fix queue                  | Pending    |
 | 5 | AI assistant with read-only tools                   | Pending    |
 | 6 | Write actions: PRs, deploys, rollback               | Pending    |
@@ -252,6 +253,19 @@ orbiting dot per connected repo, coloured by health. It reads from `/api/core`,
 which returns an empty node list until the phase 2 project registry fills it.
 All motion is CSS-driven, so `prefers-reduced-motion` is honoured.
 
+### Phase 3: GitHub read
+
+Phase 3 adds GitHub integration, storing the user's access token encrypted in
+the `integrations` table. When the user signs in, their token is saved; the
+Worker uses it to proxy API calls to GitHub, keeping credentials server-side.
+
+The **Repo Console** screen (`/repo`) lets operators browse repository trees,
+read files, and view commit history — all read-only in Phase 3. Phase 6 adds
+write actions: opening PRs and triggering deployments from here.
+
+Token encryption is currently simple XOR (not production-ready); real
+deployments should use proper encryption like libsodium or nacl.
+
 ---
 
 ## Layout
@@ -266,12 +280,14 @@ worker/            Cloudflare Worker — API, auth, authorization
   crypto.ts        HMAC signing, opaque ids, IP hashing
   projects.ts      (Phase 2) Project registry and metrics data layer
   api.ts           (Phase 2) API handlers: project CRUD, metrics, overview
+  github.ts        (Phase 3) GitHub API proxy, token storage, tree/file/commit access
 migrations/        D1 schema
   0001_*           Auth foundation (profiles, sessions, roles)
   0002_*           Project registry (projects, metrics_daily, events)
+  0003_*           GitHub integration (integrations table)
 src/               React client
   components/      CoreOrb, AppShell, AssistantDock, Modal, ProjectForm, icons
-  screens/         Login, Overview, Projects, ProjectDetail, PhasePending
+  screens/         Login, Overview, Projects, ProjectDetail, RepoConsole, PhasePending
   lib/             API client, navigation config, formatters
 scripts/           Deployment and seeding
 legacy/            Prior unrelated prototype, kept for reference

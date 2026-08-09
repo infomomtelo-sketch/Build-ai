@@ -2,22 +2,43 @@ import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "./components/AppShell";
 import { Login } from "./screens/Login";
 import { Overview } from "./screens/Overview";
+import { Projects } from "./screens/Projects";
+import { ProjectDetail } from "./screens/ProjectDetail";
+import { RepoConsole } from "./screens/RepoConsole";
 import { PhasePending } from "./screens/PhasePending";
-import { entryForPath, SHIPPED_THROUGH } from "./lib/nav";
-import { api, ApiError, type AuthConfig, type CoreTelemetry, type Viewer } from "./lib/api";
+import { NAV, SHIPPED_THROUGH, entryForPath } from "./lib/nav";
+import {
+  api,
+  ApiError,
+  type AuthConfig,
+  type CoreTelemetry,
+  type Overview as OverviewData,
+  type Project,
+  type Viewer,
+} from "./lib/api";
 
 type AuthState =
   | { status: "booting" }
   | { status: "anonymous"; config: AuthConfig | null }
   | { status: "authenticated"; viewer: Viewer };
 
+/** `/projects/<uuid>` → the id, else null. */
+function projectIdFromPath(pathname: string): string | null {
+  const m = pathname.match(/^\/projects\/([0-9a-fA-F-]{36})$/);
+  return m ? m[1] : null;
+}
+
 export default function App() {
   const [auth, setAuth] = useState<AuthState>({ status: "booting" });
   const [path, setPath] = useState(window.location.pathname);
-  const [telemetry, setTelemetry] = useState<CoreTelemetry | null>(null);
 
-  // Identity is resolved by asking the server, never by reading storage. There
-  // is nothing in localStorage or in client code that grants access.
+  const [telemetry, setTelemetry] = useState<CoreTelemetry | null>(null);
+  const [overview, setOverview] = useState<OverviewData | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+  const [composing, setComposing] = useState(false);
+
+  // Identity comes from the server, never from storage.
   const resolveViewer = useCallback(async () => {
     try {
       const viewer = await api.me();
@@ -45,23 +66,24 @@ export default function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  // Core telemetry only exists for an authenticated owner.
+  const refresh = useCallback(async () => {
+    const [core, wall, list] = await Promise.all([
+      api.core().catch(() => null),
+      api.overview().catch(() => null),
+      api.projects().catch(() => null),
+    ]);
+    if (core) setTelemetry(core);
+    if (wall) setOverview(wall);
+    if (list) setProjects(list.projects);
+    setLoadingProjects(false);
+  }, []);
+
   useEffect(() => {
     if (auth.status !== "authenticated") return;
-    let cancelled = false;
-
-    const load = async () => {
-      const data = await api.core().catch(() => null);
-      if (!cancelled && data) setTelemetry(data);
-    };
-
-    void load();
-    const timer = window.setInterval(load, 30_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [auth.status]);
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 30_000);
+    return () => window.clearInterval(timer);
+  }, [auth.status, refresh]);
 
   const navigate = useCallback((to: string) => {
     window.history.pushState({}, "", to);
@@ -71,6 +93,8 @@ export default function App() {
   const logout = useCallback(async () => {
     await api.logout().catch(() => undefined);
     setTelemetry(null);
+    setOverview(null);
+    setProjects([]);
     window.history.replaceState({}, "", "/login");
     setPath("/login");
     setAuth({ status: "anonymous", config: await api.authConfig().catch(() => null) });
@@ -88,7 +112,52 @@ export default function App() {
     return <Login config={auth.config} onAuthenticated={() => void resolveViewer()} />;
   }
 
-  const entry = entryForPath(path);
+  const detailId = projectIdFromPath(path);
+  const entry = detailId ? NAV.find((n) => n.id === "projects")! : entryForPath(path);
+
+  const openProject = (id: string) => navigate(`/projects/${id}`);
+  const startCompose = () => {
+    navigate("/projects");
+    setComposing(true);
+  };
+
+  let screen;
+  if (detailId) {
+    screen = (
+      <ProjectDetail
+        projectId={detailId}
+        onBack={() => navigate("/projects")}
+        onChanged={() => void refresh()}
+      />
+    );
+  } else if (entry.id === "overview") {
+    screen = (
+      <Overview
+        viewer={auth.viewer}
+        telemetry={telemetry}
+        data={overview}
+        onOpenProject={openProject}
+        onAddProject={startCompose}
+      />
+    );
+  } else if (entry.id === "projects") {
+    screen = (
+      <Projects
+        projects={projects}
+        loading={loadingProjects}
+        composing={composing}
+        onCompose={setComposing}
+        onChanged={() => void refresh()}
+        onOpenProject={openProject}
+      />
+    );
+  } else if (entry.id === "repo") {
+    screen = <RepoConsole />;
+  } else if (entry.phase <= SHIPPED_THROUGH) {
+    screen = <PhasePending entry={entry} />;
+  } else {
+    screen = <PhasePending entry={entry} />;
+  }
 
   return (
     <AppShell
@@ -97,11 +166,7 @@ export default function App() {
       onNavigate={navigate}
       onLogout={() => void logout()}
     >
-      {entry.phase <= SHIPPED_THROUGH ? (
-        <Overview viewer={auth.viewer} telemetry={telemetry} />
-      ) : (
-        <PhasePending entry={entry} />
-      )}
+      {screen}
     </AppShell>
   );
 }

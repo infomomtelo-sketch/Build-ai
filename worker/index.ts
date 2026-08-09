@@ -1,9 +1,35 @@
 import type { Env } from "./env";
 import { json, fail, mergeHeaders, SECURITY_HEADERS } from "./http";
-import { authConfig, devLogin, githubCallback, githubStart, logout } from "./auth";
+import {
+  authConfig,
+  devLogin,
+  githubCallback,
+  githubStart,
+  logout,
+  misroutedCallback,
+  GITHUB_CALLBACK_PATH,
+  GITHUB_CALLBACK_PATH_TRANSPOSED,
+  GITHUB_START_PATH,
+} from "./auth";
 import { getViewer } from "./session";
 import { hasRole } from "./roles";
-import { pruneRateLimits } from "./ratelimit";
+import { pruneRateLimits, rateLimit } from "./ratelimit";
+import {
+  handleCore,
+  handleCreateProject,
+  handleDeleteProject,
+  handleGetProject,
+  handleListProjects,
+  handleOverview,
+  handleRecordMetrics,
+  handleUpdateProject,
+} from "./api";
+import {
+  handleListRepos,
+  handleGetRepoTree,
+  handleGetRepoFile,
+  handleGetRepoCommits,
+} from "./github";
 
 /**
  * Route table. Anything not listed as public requires an authenticated viewer
@@ -12,8 +38,9 @@ import { pruneRateLimits } from "./ratelimit";
 const PUBLIC_ROUTES = new Set([
   "GET /api/health",
   "GET /api/auth/config",
-  "GET /api/auth/github/start",
-  "GET /api/auth/github/callback",
+  `GET ${GITHUB_START_PATH}`,
+  `GET ${GITHUB_CALLBACK_PATH}`,
+  `GET ${GITHUB_CALLBACK_PATH_TRANSPOSED}`,
   "POST /api/auth/dev-login",
   "POST /api/auth/logout",
 ]);
@@ -47,15 +74,20 @@ async function handleApi(
   env: Env,
   ctx: ExecutionContext,
 ): Promise<Response> {
+  const url = new URL(request.url);
+
   if (route === "GET /api/health") {
-    return json({ ok: true, app: env.APP_NAME ?? "JARVIS", phase: 1 });
+    return json({ ok: true, app: env.APP_NAME ?? "JARVIS", phase: 2 });
   }
 
   if (route === "GET /api/auth/config") return authConfig(env);
-  if (route === "GET /api/auth/github/start") return githubStart(env, request);
-  if (route === "GET /api/auth/github/callback") {
+  if (route === `GET ${GITHUB_START_PATH}`) return githubStart(env, request);
+  if (route === `GET ${GITHUB_CALLBACK_PATH}`) {
     ctx.waitUntil(pruneRateLimits(env));
     return githubCallback(env, request);
+  }
+  if (route === `GET ${GITHUB_CALLBACK_PATH_TRANSPOSED}`) {
+    return misroutedCallback(env, request);
   }
   if (route === "POST /api/auth/dev-login") return devLogin(env, request);
   if (route === "POST /api/auth/logout") return logout(env, request);
@@ -85,15 +117,73 @@ async function handleApi(
     });
   }
 
-  if (route === "GET /api/core") {
-    // Phase 1: the core orb runs on a real endpoint with placeholder telemetry.
-    // Phase 2 replaces this with the project registry; the shape stays.
-    return json({
-      activity: 0,
-      nodes: [],
-      phase: 1,
-      message: "Project registry lands in phase 2.",
-    });
+  if (route === "GET /api/core") return handleCore(env);
+  if (route === "GET /api/overview") return handleOverview(env);
+
+  // ── project registry ────────────────────────────────────────────────────
+  if (route === "GET /api/projects") return handleListProjects(env);
+  if (route === "POST /api/projects") {
+    const limit = await rateLimit(env, "write", viewer.id, 120, 60);
+    if (!limit.allowed) return fail(429, "rate_limited", "Slow down.");
+    return handleCreateProject(env, request, viewer);
+  }
+
+  // /api/projects/:id and /api/projects/:id/metrics
+  const projectMatch = url.pathname.match(
+    /^\/api\/projects\/([0-9a-fA-F-]{36})(\/metrics)?$/,
+  );
+  if (projectMatch) {
+    const [, projectId, metricsSuffix] = projectMatch;
+
+    if (metricsSuffix) {
+      if (request.method !== "POST") {
+        return fail(405, "method_not_allowed", "Use POST to record metrics.");
+      }
+      const limit = await rateLimit(env, "write", viewer.id, 120, 60);
+      if (!limit.allowed) return fail(429, "rate_limited", "Slow down.");
+      return handleRecordMetrics(env, request, projectId, viewer);
+    }
+
+    switch (request.method) {
+      case "GET":
+        return handleGetProject(env, projectId);
+      case "PATCH": {
+        const limit = await rateLimit(env, "write", viewer.id, 120, 60);
+        if (!limit.allowed) return fail(429, "rate_limited", "Slow down.");
+        return handleUpdateProject(env, request, projectId, viewer);
+      }
+      case "DELETE": {
+        const limit = await rateLimit(env, "write", viewer.id, 120, 60);
+        if (!limit.allowed) return fail(429, "rate_limited", "Slow down.");
+        return handleDeleteProject(env, projectId, viewer);
+      }
+      default:
+        return fail(405, "method_not_allowed", "Unsupported method.");
+    }
+  }
+
+  // ── github integration (phase 3) ────────────────────────────────────────
+  if (route === "GET /api/github/repos") return handleListRepos(env, viewer.id);
+
+  const repoMatch = url.pathname.match(/^\/api\/github\/repos\/([^\/]+)(?:\/(.*))?$/);
+  if (repoMatch) {
+    const repo = decodeURIComponent(repoMatch[1]);
+    const subpath = repoMatch[2];
+
+    if (subpath === "tree") {
+      const path = url.searchParams.get("path") ?? undefined;
+      return handleGetRepoTree(env, viewer.id, repo, path);
+    }
+
+    if (subpath?.startsWith("file?")) {
+      const path = url.searchParams.get("path") ?? "";
+      if (!path) return fail(400, "bad_request", "File path required.");
+      return handleGetRepoFile(env, viewer.id, repo, path);
+    }
+
+    if (subpath === "commits") {
+      return handleGetRepoCommits(env, viewer.id, repo);
+    }
   }
 
   return fail(404, "not_found", "No such endpoint.");

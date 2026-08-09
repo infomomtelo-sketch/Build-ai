@@ -5,9 +5,11 @@
 A single-operator mission control that monitors, codes, fixes, and deploys every
 app you own. Dark, cinematic, HUD-style.
 
-**Phase 1 is shipped:** auth, server-side owner allowlist, the shell layout, and
-the animated core. Phases 2–7 are scaffolded but deliberately empty — a screen
-goes live only once it reads real data.
+**Phases 1–2 are shipped:** auth, owner allowlist, shell, animated core, project
+registry, and manual metrics entry. The wall displays per-project health, MRR
+trend, users, errors, and a rolling event log. **Phase 3 is scaffolded** with GitHub
+read (tree/file/commit browsing); it goes live once deployed. Phases 4–7 are
+scaffolded but empty — a screen goes live only once it reads real data.
 
 ---
 
@@ -27,8 +29,8 @@ goes live only once it reads real data.
 | # | Scope                                              | State      |
 | - | -------------------------------------------------- | ---------- |
 | 1 | Auth + owner allowlist + shell + animated core      | **Shipped** |
-| 2 | Project registry + manual metrics entry             | Pending    |
-| 3 | GitHub read (tree, file, commits) + repo console    | Pending    |
+| 2 | Project registry + manual metrics entry + wall       | **Shipped** |
+| 3 | GitHub read (tree, file, commits) + repo console    | Scaffolded |
 | 4 | Metrics + error ingest + fix queue                  | Pending    |
 | 5 | AI assistant with read-only tools                   | Pending    |
 | 6 | Write actions: PRs, deploys, rollback               | Pending    |
@@ -44,8 +46,28 @@ Register a GitHub OAuth app first (see step 3 below for the two URLs), then:
 
 ```bash
 npm install
-npx wrangler login
+npx wrangler login          # or: export CLOUDFLARE_API_TOKEN=…
 npm run setup
+```
+
+`wrangler login` opens a browser. To stay headless — CI, a container, a remote
+session — create an API token instead and export `CLOUDFLARE_API_TOKEN`.
+Everything below works identically either way.
+
+Token scopes: **Workers Scripts: Edit**, **D1: Edit**, **Account Settings:
+Read** (the last is what `wrangler whoami` reads to resolve your account).
+
+Keep the token out of shell history — write it to a file without ever passing
+it as an argument, then source that file per session:
+
+```bash
+mkdir -p ~/.config/cloudflare
+read -rs TOKEN                                   # typed, not echoed, not in history
+printf 'CLOUDFLARE_API_TOKEN=%s\n' "$TOKEN" > ~/.config/cloudflare/env
+chmod 600 ~/.config/cloudflare/env
+unset TOKEN
+
+set -a; . ~/.config/cloudflare/env; set +a       # once per shell session
 ```
 
 `npm run setup` creates the D1 database, writes its id into `wrangler.jsonc`,
@@ -87,6 +109,14 @@ Create one at <https://github.com/settings/developers>:
 - **Authorization callback URL** —
   `https://jarvis-build-command.infomomtelo.workers.dev/api/auth/github/callback`
 
+> **The callback path is `/api/auth/github/callback`.**
+> Not `/api/auth/callback/github` — the segment order matters. The Worker sends
+> this exact path as its `redirect_uri` and GitHub compares it byte-for-byte,
+> so a swapped or trailing-slashed version fails with a `redirect_uri` mismatch
+> before your code ever runs. The path is defined once as
+> `GITHUB_CALLBACK_PATH` in `worker/auth.ts`; if you change it there, re-register
+> the app to match.
+
 ### 4. Set the secrets
 
 These live only inside the Worker. Nothing in this codebase returns, logs, or
@@ -124,6 +154,30 @@ Then, in two terminals:
 npm run dev:api    # Worker + local D1 on :8787
 npm run dev        # UI on :5173, proxying /api to :8787
 ```
+
+### Signing in locally
+
+`ALLOW_DEV_LOGIN` exists precisely so you do **not** need a GitHub OAuth app to
+work locally. Use it unless you are specifically testing the OAuth flow itself.
+
+If you do want the real GitHub flow locally, register a **second** OAuth app —
+a GitHub OAuth app has exactly one callback URL, so localhost cannot share the
+production app. Which URL you register depends on the port you open in the
+browser, because the Worker derives its `redirect_uri` from the incoming
+`Host` header:
+
+| You run           | You open                | Register                                          |
+| ----------------- | ----------------------- | ------------------------------------------------- |
+| `npm run dev`     | `http://localhost:5173` | `http://localhost:5173/api/auth/github/callback`   |
+| `npm run preview` | `http://localhost:8787` | `http://localhost:8787/api/auth/github/callback`   |
+
+The Vite proxy is configured with `changeOrigin: false`, so the browser's origin
+passes straight through to the Worker — verified, not assumed. Register the port
+you actually browse to, and use `localhost` consistently: `127.0.0.1` and
+`localhost` are different origins to GitHub.
+
+Then add `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` for that second app to
+`.dev.vars`.
 
 `ALLOW_DEV_LOGIN` skips the OAuth round trip but **not** the owner allowlist —
 a non-allowlisted address is refused locally exactly as it is in production. It
@@ -199,6 +253,19 @@ orbiting dot per connected repo, coloured by health. It reads from `/api/core`,
 which returns an empty node list until the phase 2 project registry fills it.
 All motion is CSS-driven, so `prefers-reduced-motion` is honoured.
 
+### Phase 3: GitHub read
+
+Phase 3 adds GitHub integration, storing the user's access token encrypted in
+the `integrations` table. When the user signs in, their token is saved; the
+Worker uses it to proxy API calls to GitHub, keeping credentials server-side.
+
+The **Repo Console** screen (`/repo`) lets operators browse repository trees,
+read files, and view commit history — all read-only in Phase 3. Phase 6 adds
+write actions: opening PRs and triggering deployments from here.
+
+Token encryption is currently simple XOR (not production-ready); real
+deployments should use proper encryption like libsodium or nacl.
+
 ---
 
 ## Layout
@@ -211,10 +278,17 @@ worker/            Cloudflare Worker — API, auth, authorization
   roles.ts         hasRole() — the single authorization chokepoint
   ratelimit.ts     D1 fixed-window limiter
   crypto.ts        HMAC signing, opaque ids, IP hashing
+  projects.ts      (Phase 2) Project registry and metrics data layer
+  api.ts           (Phase 2) API handlers: project CRUD, metrics, overview
+  github.ts        (Phase 3) GitHub API proxy, token storage, tree/file/commit access
 migrations/        D1 schema
+  0001_*           Auth foundation (profiles, sessions, roles)
+  0002_*           Project registry (projects, metrics_daily, events)
+  0003_*           GitHub integration (integrations table)
 src/               React client
-  components/      CoreOrb, AppShell, AssistantDock, icons
-  screens/         Login, Overview, PhasePending
-  lib/             API client, navigation config
+  components/      CoreOrb, AppShell, AssistantDock, Modal, ProjectForm, icons
+  screens/         Login, Overview, Projects, ProjectDetail, RepoConsole, PhasePending
+  lib/             API client, navigation config, formatters
+scripts/           Deployment and seeding
 legacy/            Prior unrelated prototype, kept for reference
 ```

@@ -12,10 +12,29 @@ import {
 import { rateLimit } from "./ratelimit";
 import { grantRole, isAllowlistedOwner } from "./roles";
 import { createSession, destroySession, getViewer } from "./session";
+import { storeGitHubToken } from "./github";
 
 const OAUTH_STATE_COOKIE = "jarvis_oauth_state";
 const OAUTH_SCOPES = "read:user user:email";
 const USER_AGENT = "jarvis-build-command";
+
+/**
+ * The OAuth paths, defined once. The callback path in particular must be
+ * byte-identical to the Authorization callback URL registered on the GitHub
+ * OAuth app — GitHub compares the `redirect_uri` exactly and rejects any
+ * mismatch. Keeping it a single constant stops the route table and the
+ * `redirect_uri` from drifting apart.
+ */
+export const GITHUB_START_PATH = "/api/auth/github/start";
+export const GITHUB_CALLBACK_PATH = "/api/auth/github/callback";
+
+/**
+ * The transposed spelling of the callback path. It is easy to register on the
+ * GitHub app by mistake, and without this it lands on the default-deny gate and
+ * answers a bare 401 — which looks like a broken session rather than a
+ * misconfigured OAuth app. Handled explicitly so the failure names itself.
+ */
+export const GITHUB_CALLBACK_PATH_TRANSPOSED = "/api/auth/callback/github";
 
 interface GithubUser {
   id: number;
@@ -94,7 +113,7 @@ export async function githubStart(env: Env, request: Request): Promise<Response>
 
   const authorize = new URL("https://github.com/login/oauth/authorize");
   authorize.searchParams.set("client_id", env.GITHUB_CLIENT_ID!);
-  authorize.searchParams.set("redirect_uri", `${url.origin}/api/auth/github/callback`);
+  authorize.searchParams.set("redirect_uri", `${url.origin}${GITHUB_CALLBACK_PATH}`);
   authorize.searchParams.set("scope", OAUTH_SCOPES);
   authorize.searchParams.set("state", state);
   authorize.searchParams.set("allow_signup", "false");
@@ -141,7 +160,7 @@ export async function githubCallback(env: Env, request: Request): Promise<Respon
       client_id: env.GITHUB_CLIENT_ID,
       client_secret: env.GITHUB_CLIENT_SECRET,
       code,
-      redirect_uri: `${url.origin}/api/auth/github/callback`,
+      redirect_uri: `${url.origin}${GITHUB_CALLBACK_PATH}`,
     }),
   });
 
@@ -202,11 +221,23 @@ export async function githubCallback(env: Env, request: Request): Promise<Respon
 
   await grantRole(env, userId, "owner");
   await createSession(env, request, userId, headers);
+  await storeGitHubToken(env, userId, accessToken, ghUser.login, ghUser.id, ghUser.avatar_url ?? "");
   await logAuthEvent(env, request, "login_ok", email, "github");
 
-  // The GitHub access token is intentionally discarded here. Phase 3 will
-  // store it encrypted in `integrations`, server-side only.
   return redirect(new URL("/", url.origin).toString(), headers);
+}
+
+/**
+ * GET /api/auth/callback/github — not a real endpoint. Reached only when the
+ * GitHub OAuth app has the segments transposed. Sends the operator to the login
+ * screen with an error that states the correct path instead of a bare 401.
+ */
+export async function misroutedCallback(env: Env, request: Request): Promise<Response> {
+  const url = new URL(request.url);
+  await logAuthEvent(env, request, "login_denied", null, "callback_path_mismatch");
+  const to = new URL("/login", url.origin);
+  to.searchParams.set("error", "callback_path_mismatch");
+  return redirect(to.toString());
 }
 
 /** POST /api/auth/dev-login — local development only. */

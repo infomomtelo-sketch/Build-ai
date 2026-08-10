@@ -967,6 +967,28 @@ a {
   margin-bottom: var(--space-2);
 }
 
+/* Replies carry their own line breaks — tool output and lists arrive as plain
+   text, so the transcript has to preserve them rather than collapsing to a
+   paragraph. Long identifiers wrap instead of forcing the dock to scroll. */
+.dock-msg {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The operator's own turns read as quieter than the assistant's answers. */
+.dock-msg[data-role="user"] {
+  background: var(--surface-inset);
+  border-color: var(--border-subtle);
+}
+
+.dock-msg[data-role="user"] .dock-msg__from {
+  color: var(--text-muted);
+}
+
+.dock-msg--pending {
+  border-style: dashed;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    login
    ══════════════════════════════════════════════════════════════════════════ */

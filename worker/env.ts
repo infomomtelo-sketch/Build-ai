@@ -13,6 +13,10 @@ export interface Env {
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;
 
+  // Phase 5. The assistant is offline until this is set; it is never returned
+  // to the browser — the Worker is the only thing that calls the model.
+  ANTHROPIC_API_KEY?: string;
+
   // Local development escape hatch. Off unless explicitly "true", and refused
   // outright when ENVIRONMENT is "production" (see worker/auth.ts).
   ALLOW_DEV_LOGIN?: string;

@@ -36,6 +36,7 @@ import {
   handleGetErrorGroup,
   handleResolveError,
 } from "./errors";
+import { handleAssistant } from "./assistant";
 
 /**
  * Route table. Anything not listed as public requires an authenticated viewer
@@ -190,6 +191,17 @@ async function handleApi(
     if (subpath === "commits") {
       return handleGetRepoCommits(env, viewer.id, repo);
     }
+  }
+
+  // ── assistant (phase 5) ─────────────────────────────────────────────────
+  if (route === "POST /api/assistant") {
+    // Model calls are the most expensive thing this Worker does, and each one
+    // can fan out into several tool round-trips — keep the window tight.
+    const limit = await rateLimit(env, "assistant", viewer.id, 30, 300);
+    if (!limit.allowed) {
+      return fail(429, "rate_limited", "Too many assistant requests. Wait a few minutes.");
+    }
+    return handleAssistant(env, request, viewer);
   }
 
   // ── error ingest (phase 4) ──────────────────────────────────────────────

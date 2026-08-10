@@ -161,6 +161,17 @@ export interface ErrorDetail extends ErrorGroup {
   context: Record<string, unknown> | null;
 }
 
+export interface AssistantTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface AssistantReply {
+  reply: string;
+  stopReason: string | null;
+  usage?: { inputTokens: number; outputTokens: number };
+}
+
 export const api = {
   authConfig: () => request<AuthConfig>("/api/auth/config"),
 
@@ -225,6 +236,12 @@ export const api = {
   resolveError: (projectId: string, fingerprint: string) =>
     request<{ ok: true }>(`/api/projects/${projectId}/errors/${fingerprint}`, {
       method: "PATCH",
+    }),
+
+  assistant: (messages: AssistantTurn[]) =>
+    request<AssistantReply>("/api/assistant", {
+      method: "POST",
+      body: JSON.stringify({ messages }),
     }),
 };
 

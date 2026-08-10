@@ -7,8 +7,8 @@ app you own. Dark, cinematic, HUD-style.
 
 **Phases 1–2 are shipped:** auth, owner allowlist, shell, animated core, project
 registry, and manual metrics entry. The wall displays per-project health, MRR
-trend, users, errors, and a rolling event log. **Phase 3 is scaffolded** with GitHub
-read (tree/file/commit browsing); it goes live once deployed. Phases 4–7 are
+trend, users, errors, and a rolling event log. **Phases 3–5 are scaffolded** — GitHub
+read, error ingest with a fix queue, and a read-only AI assistant. Phases 6–7 are
 scaffolded but empty — a screen goes live only once it reads real data.
 
 ---
@@ -31,8 +31,8 @@ scaffolded but empty — a screen goes live only once it reads real data.
 | 1 | Auth + owner allowlist + shell + animated core      | **Shipped** |
 | 2 | Project registry + manual metrics entry + wall       | **Shipped** |
 | 3 | GitHub read (tree, file, commits) + repo console    | Scaffolded |
-| 4 | Metrics + error ingest + fix queue                  | Pending    |
-| 5 | AI assistant with read-only tools                   | Pending    |
+| 4 | Metrics + error ingest + fix queue                  | **Shipped** |
+| 5 | AI assistant with read-only tools                   | Scaffolded |
 | 6 | Write actions: PRs, deploys, rollback               | Pending    |
 | 7 | Daily briefing + voice mode                         | Pending    |
 
@@ -127,7 +127,13 @@ npx wrangler secret put OWNER_EMAILS         # "you@example.com,you@work.com"
 npx wrangler secret put SESSION_SECRET       # openssl rand -hex 32
 npx wrangler secret put GITHUB_CLIENT_ID
 npx wrangler secret put GITHUB_CLIENT_SECRET
+npx wrangler secret put ANTHROPIC_API_KEY    # phase 5 assistant; optional until then
 ```
+
+`ANTHROPIC_API_KEY` comes from **console.anthropic.com → Settings → API keys**.
+For local development put it in `.dev.vars` instead. Until it is set, the
+assistant answers every request with a 503 naming the missing secret — the rest
+of the console works normally without it.
 
 ### 5. Deploy
 
@@ -281,6 +287,8 @@ worker/            Cloudflare Worker — API, auth, authorization
   projects.ts      (Phase 2) Project registry and metrics data layer
   api.ts           (Phase 2) API handlers: project CRUD, metrics, overview
   github.ts        (Phase 3) GitHub API proxy, token storage, tree/file/commit access
+  errors.ts        (Phase 4) Error ingest, fingerprinting, impact ranking
+  assistant.ts     (Phase 5) Read-only assistant — tools, system prompt, tool loop
 migrations/        D1 schema
   0001_*           Auth foundation (profiles, sessions, roles)
   0002_*           Project registry (projects, metrics_daily, events)

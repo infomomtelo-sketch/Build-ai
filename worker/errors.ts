@@ -82,62 +82,62 @@ export async function handleIngestError(
   }
 }
 
+/**
+ * Unresolved error groups for a project, ranked by impact. Shared by the HTTP
+ * handler and the assistant's summarize_errors tool so both rank identically.
+ */
+export async function listErrorGroups(
+  env: Env,
+  projectId: string,
+): Promise<ErrorGroup[]> {
+  const db = env.DB;
+
+  const errors = await db
+    .prepare(
+      `
+      SELECT DISTINCT
+        fingerprint, message, count, affected_sessions,
+        first_seen, last_seen, resolved_at
+      FROM errors
+      WHERE project_id = ? AND resolved_at IS NULL
+      ORDER BY last_seen DESC
+      LIMIT 100
+    `,
+    )
+    .bind(projectId)
+    .all<{
+      fingerprint: string;
+      message: string;
+      count: number;
+      affected_sessions: number;
+      first_seen: string;
+      last_seen: string;
+      resolved_at: string | null;
+    }>();
+
+  if (!errors.results) return [];
+
+  const groups: ErrorGroup[] = errors.results.map((e) => ({
+    fingerprint: e.fingerprint,
+    message: e.message,
+    count: e.count,
+    affectedSessions: e.affected_sessions,
+    firstSeen: e.first_seen,
+    lastSeen: e.last_seen,
+    impactScore: computeImpactScore(e.count, e.affected_sessions, e.last_seen),
+    resolved: !!e.resolved_at,
+  }));
+
+  groups.sort((a, b) => b.impactScore - a.impactScore);
+  return groups;
+}
+
 export async function handleListErrors(
   env: Env,
   projectId: string,
 ): Promise<Response> {
   try {
-    const db = env.DB;
-
-    // Fetch all unresolved errors for the project, grouped by fingerprint
-    const errors = await db
-      .prepare(
-        `
-        SELECT DISTINCT
-          fingerprint,
-          message,
-          count,
-          affected_sessions,
-          first_seen,
-          last_seen,
-          resolved_at
-        FROM errors
-        WHERE project_id = ? AND resolved_at IS NULL
-        ORDER BY last_seen DESC
-        LIMIT 100
-      `,
-      )
-      .bind(projectId)
-      .all<{
-        fingerprint: string;
-        message: string;
-        count: number;
-        affected_sessions: number;
-        first_seen: string;
-        last_seen: string;
-        resolved_at: string | null;
-      }>();
-
-    if (!errors.results) {
-      return json({ errors: [] });
-    }
-
-    // Compute impact scores
-    const groups: ErrorGroup[] = errors.results.map((e) => ({
-      fingerprint: e.fingerprint,
-      message: e.message,
-      count: e.count,
-      affectedSessions: e.affected_sessions,
-      firstSeen: e.first_seen,
-      lastSeen: e.last_seen,
-      impactScore: computeImpactScore(e.count, e.affected_sessions, e.last_seen),
-      resolved: !!e.resolved_at,
-    }));
-
-    // Sort by impact score descending
-    groups.sort((a, b) => b.impactScore - a.impactScore);
-
-    return json({ errors: groups });
+    return json({ errors: await listErrorGroups(env, projectId) });
   } catch (err) {
     console.error("Failed to list errors:", err);
     return fail(500, "list_failed", `Failed to list errors: ${String(err)}`);

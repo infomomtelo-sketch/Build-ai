@@ -5,6 +5,7 @@ import { Overview } from "./screens/Overview";
 import { Projects } from "./screens/Projects";
 import { ProjectDetail } from "./screens/ProjectDetail";
 import { RepoConsole } from "./screens/RepoConsole";
+import { FixQueue } from "./screens/FixQueue";
 import { PhasePending } from "./screens/PhasePending";
 import { NAV, SHIPPED_THROUGH, entryForPath } from "./lib/nav";
 import {
@@ -153,6 +154,8 @@ export default function App() {
     );
   } else if (entry.id === "repo") {
     screen = <RepoConsole />;
+  } else if (entry.id === "fix") {
+    screen = <FixQueue projects={projects} />;
   } else if (entry.phase <= SHIPPED_THROUGH) {
     screen = <PhasePending entry={entry} />;
   } else {

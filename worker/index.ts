@@ -30,6 +30,12 @@ import {
   handleGetRepoFile,
   handleGetRepoCommits,
 } from "./github";
+import {
+  handleIngestError,
+  handleListErrors,
+  handleGetErrorGroup,
+  handleResolveError,
+} from "./errors";
 
 /**
  * Route table. Anything not listed as public requires an authenticated viewer
@@ -183,6 +189,44 @@ async function handleApi(
 
     if (subpath === "commits") {
       return handleGetRepoCommits(env, viewer.id, repo);
+    }
+  }
+
+  // ── error ingest (phase 4) ──────────────────────────────────────────────
+  if (route === "POST /api/errors") {
+    const limit = await rateLimit(env, "write", viewer.id, 1000, 60);
+    if (!limit.allowed) return fail(429, "rate_limited", "Error ingest rate limited.");
+
+    // Get project ID from header or query
+    const projectId = request.headers.get("x-project-id") ?? url.searchParams.get("project");
+    if (!projectId) return fail(400, "bad_request", "Project ID required.");
+
+    return handleIngestError(env, projectId, request);
+  }
+
+  // /api/projects/:id/errors and /api/projects/:id/errors/:fingerprint
+  const errorsMatch = url.pathname.match(
+    /^\/api\/projects\/([0-9a-fA-F-]{36})\/errors(?:\/([a-f0-9]+))?$/,
+  );
+  if (errorsMatch) {
+    const [, projectId, fingerprint] = errorsMatch;
+
+    if (request.method === "GET") {
+      if (fingerprint) {
+        return handleGetErrorGroup(env, projectId, fingerprint);
+      } else {
+        return handleListErrors(env, projectId);
+      }
+    }
+
+    if (request.method === "PATCH" && fingerprint) {
+      const limit = await rateLimit(env, "write", viewer.id, 120, 60);
+      if (!limit.allowed) return fail(429, "rate_limited", "Slow down.");
+      return handleResolveError(env, projectId, fingerprint);
+    }
+
+    if (request.method !== "GET" && request.method !== "PATCH") {
+      return fail(405, "method_not_allowed", "Unsupported method.");
     }
   }
 

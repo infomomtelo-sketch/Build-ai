@@ -145,6 +145,22 @@ export interface MetricsInput {
   uptimePct?: string | number | null;
 }
 
+export interface ErrorGroup {
+  fingerprint: string;
+  message: string;
+  count: number;
+  affectedSessions: number;
+  firstSeen: string;
+  lastSeen: string;
+  impactScore: number;
+  resolved: boolean;
+}
+
+export interface ErrorDetail extends ErrorGroup {
+  stackTrace: string | null;
+  context: Record<string, unknown> | null;
+}
+
 export const api = {
   authConfig: () => request<AuthConfig>("/api/auth/config"),
 
@@ -199,6 +215,17 @@ export const api = {
 
   repoFile: (repo: string, path: string) =>
     request<{ file: any }>(`/api/github/repos/${repo}/file?path=${encodeURIComponent(path)}`),
+
+  projectErrors: (projectId: string) =>
+    request<{ errors: ErrorGroup[] }>(`/api/projects/${projectId}/errors`),
+
+  errorGroup: (projectId: string, fingerprint: string) =>
+    request<{ group: ErrorDetail }>(`/api/projects/${projectId}/errors/${fingerprint}`),
+
+  resolveError: (projectId: string, fingerprint: string) =>
+    request<{ ok: true }>(`/api/projects/${projectId}/errors/${fingerprint}`, {
+      method: "PATCH",
+    }),
 };
 
 /** Human-readable text for the error codes the auth redirect can hand back. */

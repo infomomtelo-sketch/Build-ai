@@ -16,7 +16,7 @@
       "binding": "DB",
       "database_name": "jarvis",
       // Replace with the id printed by: wrangler d1 create jarvis
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "3e965415-95ac-4ec4-86b8-d423df2a3b2f",
       "migrations_dir": "migrations"
     }
   ],

@@ -9,7 +9,7 @@ app you own. Dark, cinematic, HUD-style.
 registry, and manual metrics entry. The wall displays per-project health, MRR
 trend, users, errors, and a rolling event log. **Phases 3–5 are scaffolded** — GitHub
 read, error ingest with a fix queue, and a read-only AI assistant. Phases 6–7 are
-scaffolded but empty — a screen goes live only once it reads real data.
+scaffolded but empty — a screen goes live only once it reads real data. 
 
 ---
 

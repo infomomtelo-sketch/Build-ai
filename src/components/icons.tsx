@@ -121,7 +121,8 @@ export function IconVolume({ className }: IconProps) {
   );
 }
 
-export function IconMark({ className }: IconProps) {  return (
+export function IconMark({ className }: IconProps) {
+  return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
       <circle cx="12" cy="12" r="10.2" fill="none" stroke="var(--accent-edge)" strokeWidth="1" />
       <circle

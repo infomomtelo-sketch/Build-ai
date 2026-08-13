@@ -378,7 +378,7 @@ export function Briefing() {
           {voiceBusy && (
             <div className="briefing-voice-qa__turn briefing-voice-qa__turn--pending">
               <span className="briefing-voice-qa__from">JARVIS</span>
-              <span className="hud-label">Reading…</span>
+              <span className="hud-label">Thinking…</span>
             </div>
           )}
           {voiceAnswer && !voiceBusy && (

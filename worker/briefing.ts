@@ -158,9 +158,12 @@ export async function handleBriefing(env: Env, viewer: Viewer): Promise<Response
 
     let sections: BriefingSections;
     try {
-      // Strip any accidental code fences before parsing.
-      const stripped = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-      sections = JSON.parse(stripped) as BriefingSections;
+      // Strip accidental code fences, then extract the outermost JSON object.
+      const stripped = rawText.replace(/^```(?:json)?\s*/im, "").replace(/\s*```\s*$/m, "");
+      const first = stripped.indexOf("{");
+      const last = stripped.lastIndexOf("}");
+      const jsonSlice = first !== -1 && last > first ? stripped.slice(first, last + 1) : stripped;
+      sections = JSON.parse(jsonSlice) as BriefingSections;
     } catch {
       // Model didn't follow the JSON instruction — surface what it said in the
       // status field so the operator still gets something useful.

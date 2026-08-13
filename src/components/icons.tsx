@@ -100,8 +100,28 @@ export function IconGithub({ className }: IconProps) {
   );
 }
 
-export function IconMark({ className }: IconProps) {
+export function IconMic({ className }: IconProps) {
   return (
+    <svg {...base} className={className} aria-hidden="true">
+      <rect x="9" y="2" width="6" height="12" rx="3" />
+      <path d="M5 10a7 7 0 0 0 14 0" />
+      <line x1="12" y1="17" x2="12" y2="21" />
+      <line x1="9" y1="21" x2="15" y2="21" />
+    </svg>
+  );
+}
+
+export function IconVolume({ className }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+    </svg>
+  );
+}
+
+export function IconMark({ className }: IconProps) {  return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
       <circle cx="12" cy="12" r="10.2" fill="none" stroke="var(--accent-edge)" strokeWidth="1" />
       <circle

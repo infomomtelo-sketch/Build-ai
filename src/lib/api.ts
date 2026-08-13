@@ -172,6 +172,19 @@ export interface AssistantReply {
   usage?: { inputTokens: number; outputTokens: number };
 }
 
+export interface BriefingSections {
+  status: string;
+  metrics: string;
+  errors: string;
+  shipped: string;
+  action: string;
+}
+
+export interface BriefingData {
+  generatedAt: string;
+  sections: BriefingSections;
+}
+
 export const api = {
   authConfig: () => request<AuthConfig>("/api/auth/config"),
 
@@ -243,6 +256,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ messages }),
     }),
+
+  briefing: () => request<BriefingData>("/api/briefing"),
 };
 
 /** Human-readable text for the error codes the auth redirect can hand back. */

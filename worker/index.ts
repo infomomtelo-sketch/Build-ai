@@ -37,6 +37,7 @@ import {
   handleResolveError,
 } from "./errors";
 import { handleAssistant } from "./assistant";
+import { handleBriefing } from "./briefing";
 
 /**
  * Route table. Anything not listed as public requires an authenticated viewer
@@ -202,6 +203,17 @@ async function handleApi(
       return fail(429, "rate_limited", "Too many assistant requests. Wait a few minutes.");
     }
     return handleAssistant(env, request, viewer);
+  }
+
+  // ── daily briefing (phase 7) ─────────────────────────────────────────────
+  if (route === "GET /api/briefing") {
+    // The briefing runs several tool round-trips; cap it harder than the chat
+    // assistant — one per minute, 10 per hour.
+    const limit = await rateLimit(env, "briefing", viewer.id, 10, 3600);
+    if (!limit.allowed) {
+      return fail(429, "rate_limited", "Too many briefing requests. Wait a bit.");
+    }
+    return handleBriefing(env, viewer);
   }
 
   // ── error ingest (phase 4) ──────────────────────────────────────────────
